@@ -1,0 +1,86 @@
+---
+title: "Masters_Thesis"
+author: "Mason Kenny"
+date: "2025-02-11"
+output: html_document
+---
+Model 1: Speed as a Primary Driver of Hydrodynamic Drag
+
+Define the IQR filtering function to remove extreme outliers
+remove_outliers <- function(data, col) {
+Q1 <- quantile(data[[col]], 0.25, na.rm = TRUE)
+Q3 <- quantile(data[[col]], 0.75, na.rm = TRUE)
+IQR_value <- Q3 - Q1
+lower_bound <- Q1 - 1.5 * IQR_value
+upper_bound <- Q3 + 1.5 * IQR_value
+data %>% filter(data[[col]] >= lower_bound & data[[col]] <= upper_bound)
+
+Filter outliers for both Starboard and Port Tension
+filtered_tension <- filtered_tension %>%
+remove_outliers("sb_tension_max") %>%
+remove_outliers("ps_tension_max")
+  
+Create plot after outlier removal
+ggplot(filtered_tension, aes(x = sb_tension_max, y = ps_tension_max, color = SHIP_SPEED)) +
+geom_point(alpha = 0.3, size = 0.8) +
+geom_smooth(method = "lm", formula = y ~ poly(x, 2), color = "black", se = FALSE) +
+labs(title = "Observed: Starboard vs. Port Tension (Without Extreme Outliers)",
+x = "Starboard Tension",
+y = "Port Tension",
+color = "Ship Speed (knots)") +
+scale_color_gradient(low = "blue", high = "red", limits = c(2, 5)) +
+theme_minimal()
+
+NOTE:
+Indicates that the forces acting on each side of the gear are balanced and respond similarly to hydrodynamic drag, reinforcing that warp tension is a reliable proxy for hydrodynamic drag (HD). This alone does not prove that vessel speed is the dominant driver, but it shows that tension fluctuations are not independent between the two sides.
+
+Let me know if you think additional adjustments are needed to refine this model further!
+
+
+
+> gam_model <- gam(Tension_Imbalance ~ s(SHIP_SPEED) + s(Avg_Grain) + s(SHIP_SPEED, Avg_Grain),
+data = filtered_tension_with_grain, method = "REML")
+ggplot(grid_data, aes(x = SHIP_SPEED, y = Avg_Grain, fill = Predicted_Tension_Imbalance)) 
+geom_tile() +
+geom_contour(aes(z = Predicted_Tension_Imbalance), breaks = high_imbalance_threshold, color = "black", linetype = "dashed") +
+scale_fill_viridis_c(option = "C") +
+labs(title = "Critical Imbalance Zones: Ship Speed & Sediment Type",
+x = "Ship Speed (knots)",
+y = "Sediment Type (Average Grain Size mm)",
+fill = "Predicted Tension Imbalance") +
+theme_minimal()
+
+Note: This plot visualizes predicted tension imbalance (heatmap) and critical imbalance zones (dashed contours) as a function of ship speed and sediment type. The Generalized Additive Model (GAM) estimates how warp tension asymmetry responds to hydrodynamic drag and substrate interaction
+Critical imbalance contours highlight high-risk zones where tension fluctuations exceed the 90th percentile threshold.
+
+
+
+
+
+
+
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## R Markdown
+
+This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
+
+When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
+
+```{r cars}
+summary(cars)
+```
+
+## Including Plots
+
+You can also embed plots, for example:
+
+```{r pressure, echo=FALSE}
+plot(pressure)
+```
+
+Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
