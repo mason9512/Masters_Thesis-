@@ -4,7 +4,7 @@ author: "Mason Kenny"
 date: "2025-02-11"
 output: html_document
 ---
-Model 1: Speed as a Primary Driver of Hydrodynamic Drag
+Starboard vs. Portside Tension Values (COnfirming Warp Tension as a Reliable Proxy for Hydrodynamic Drag)
 
 Define the IQR filtering function to remove extreme outliers
 remove_outliers <- function(data, col) {
@@ -32,11 +32,107 @@ scale_color_gradient(low = "blue", high = "red", limits = c(2, 5)) +
 theme_minimal()
 
 NOTE:
-Indicates that the forces acting on each side of the gear are balanced and respond similarly to hydrodynamic drag, reinforcing that warp tension is a reliable proxy for hydrodynamic drag (HD). This alone does not prove that vessel speed is the dominant driver, but it shows that tension fluctuations are not independent between the two sides.
+Indicates that the forces acting on each side of the gear respond similarly to hydrodynamic drag, reinforcing that warp tension is a reliable proxy for hydrodynamic drag (HD). This alone does not prove that vessel speed is the dominant driver, but it shows that tension fluctuations distribute similarly for port and starboard warps.
 
 Let me know if you think additional adjustments are needed to refine this model further!
 
+-------------------------------------------------------------------------------------------------
 
+Gear Behavior (Warp Angle)and Hydrodynamic Drag
+
+merged_data <- merged_data %>%
+  mutate(
+    Warp_Angle_Starboard_Depth = acos(STARBOARD_DOOR_DEPTH / STARBOARD_WARP_LENGTH) * (180 / pi),
+    Warp_Angle_Port_Depth = acos(PORTSIDE_DOOR_DEPTH / PORTSIDE_WARP_LENGTH) * (180 / pi)
+)
+# Depth Influence Model
+model_depth_starboard <- lm(Warp_Angle_Starboard_Depth ~ STARBOARD_DOOR_DEPTH, data = merged_data)
+model_depth_portside <- lm(Warp_Angle_Port_Depth ~ PORTSIDE_DOOR_DEPTH, data = merged_data)
+
+# Ship Speed Influence Model
+model_speed_starboard <- lm(Warp_Angle_Starboard_Depth ~ SHIP_SPEED, data = merged_data)
+model_speed_portside <- lm(Warp_Angle_Port_Depth ~ SHIP_SPEED, data = merged_data)
+# Quadratic Speed Influence Model
+model_speed_starboard_quad <- lm(Warp_Angle_Starboard_Depth ~ SHIP_SPEED + I(SHIP_SPEED^2), data = merged_data)
+model_speed_portside_quad <- lm(Warp_Angle_Port_Depth ~ SHIP_SPEED + I(SHIP_SPEED^2), data = merged_data)
+library(ggplot2)
+library(gridExtra)
+
+custom_theme <- theme_minimal() +
++     theme(
++         text = element_text(size = 14),
++         axis.title.y = element_text(angle = 90, vjust = 0.5),
++         plot.margin = margin(10, 10, 10, 10)
++     )
+> 
+> ### **Figure 1: Warp Angle vs. Depth (Hexbin Plot)**
+> p1 <- ggplot(merged_data, aes(x = STARBOARD_DOOR_DEPTH, y = Warp_Angle_Starboard_Depth)) +
++     geom_hex(bins = 50) +  # Uses hexagonal bins to group dense points
++     scale_fill_viridis_c() +  # Adds better color scaling
++     labs(title = "Warp Angle Starboard vs. Starboard Door Depth",
++          x = "Starboard Door Depth (m)", 
++          y = "Warp Angle Starboard (°)") + custom_theme
+> 
+> p2 <- ggplot(merged_data, aes(x = PORTSIDE_DOOR_DEPTH, y = Warp_Angle_Port_Depth)) +
++     geom_hex(bins = 50) +
++     scale_fill_viridis_c() +
++     labs(title = "Warp Angle Portside vs. Portside Door Depth",
++          x = "Portside Door Depth (m)", 
++          y = "Warp Angle Portside (°)") + custom_theme
+> 
+> grid.arrange(p1, p2, ncol = 2)
+
+ custom_theme <- theme_minimal() +
++     theme(
++         text = element_text(size = 14),
++         axis.title.y = element_text(angle = 90, vjust = 0.5),
++         plot.margin = margin(10, 10, 10, 10)
++     )
+> 
+> ### **Figure: Warp Angle vs. Ship Speed (Hexbin)**
+> p1 <- ggplot(merged_data, aes(x = SHIP_SPEED, y = Warp_Angle_Starboard_Depth)) +
++     geom_hex(bins = 50) +  # Hexbin to reduce overplotting
++     scale_fill_viridis_c() +  # Better color scaling
++     labs(title = "Warp Angle Starboard vs. Ship Speed",
++          x = "Ship Speed (knots)", 
++          y = "Warp Angle Starboard (°)") + custom_theme
+> 
+> p2 <- ggplot(merged_data, aes(x = SHIP_SPEED, y = Warp_Angle_Port_Depth)) +
++     geom_hex(bins = 50) +
++     scale_fill_viridis_c() +
++     labs(title = "Warp Angle Portside vs. Ship Speed",
++          x = "Ship Speed (knots)", 
++          y = "Warp Angle Portside (°)") + custom_theme
+> 
+> # Arrange plots side by side
+> grid.arrange(p1, p2, ncol = 2)
+
+-------------------------------------------------------------------------------------------
+Ship Heading and Hydrodynamic Drag
+
+ filtered_data <- floating_tension_with_core_df %>%
++     filter(Warp_Angle_Port > 0, Warp_Angle_Starboard > 0)
+> portside_plot <- ggplot(filtered_data, aes(x = SHIP_HEADING, y = Warp_Angle_Port)) +
++     geom_point(color = "blue", alpha = 0.5) +
++     geom_smooth(method = "loess", color = "blue", fill = "lightblue") +
++     labs(title = "Impact of Turns on Warp Angle (Portside)",
++          x = "Change in Ship Heading (°)",
++          y = "Warp Angle (°)") +
++     theme_minimal()
+> starboard_plot <- ggplot(filtered_data, aes(x = SHIP_HEADING, y = Warp_Angle_Starboard)) +
++     geom_point(color = "red", alpha = 0.5) +
++     geom_smooth(method = "loess", color = "red", fill = "pink") +
++     labs(title = "Impact of Turns on Warp Angle (Starboard)",
++          x = "Change in Ship Heading (°)",
++          y = "Warp Angle (°)") +
++     theme_minimal()
+> grid.arrange(portside_plot, starboard_plot, ncol = 2)
+
+Note: This examines how ship heading changes influence warp angle variability before incorporating pitch, roll, and force equilibrium considerations. This acts as a baseline in which warp angle is valuable in directional shifts providing insight into hydrodynamic-induced instability independent of otter door pitch and roll influences.
+
+----------------------------------------------------------------------------------------
+
+(Hydrodynamics and Substrate)
 
 > gam_model <- gam(Tension_Imbalance ~ s(SHIP_SPEED) + s(Avg_Grain) + s(SHIP_SPEED, Avg_Grain),
 data = filtered_tension_with_grain, method = "REML")
@@ -53,12 +149,162 @@ theme_minimal()
 Note: This plot visualizes predicted tension imbalance (heatmap) and critical imbalance zones (dashed contours) as a function of ship speed and sediment type. The Generalized Additive Model (GAM) estimates how warp tension asymmetry responds to hydrodynamic drag and substrate interaction
 Critical imbalance contours highlight high-risk zones where tension fluctuations exceed the 90th percentile threshold.
 
+---------------------------------------------------------------------------------------------------------------------
+Otter Door and Seafloor Contact
 
+nls_starboard <- nlsLM(Contact_Area_Starboard ~ b0 + b1 * cos(b2 * STARBOARD_DOOR_ROLL * pi / 180),
++                       data = floating_tension_with_core_df,
++                       start = list(b0 = 8, b1 = -1, b2 = 1),
++                       control = nls.lm.control(maxiter = 100))
+> 
+> # Fit nonlinear model for Portside
+> nls_portside <- nlsLM(Contact_Area_Portside ~ b0 + b1 * cos(b2 * PORTSIDE_DOOR_ROLL * pi / 180),
++                       data = floating_tension_with_core_df,
++                       start = list(b0 = 8, b1 = -1, b2 = 1),
++                       control = nls.lm.control(maxiter = 100)) 
 
+Formula: Contact_Area_Starboard ~ b0 + b1 * cos(b2 * STARBOARD_DOOR_ROLL * 
+    pi/180)
 
+Parameters:
+    Estimate Std. Error t value Pr(>|t|)    
+b0 2.631e-02  1.968e-04   133.7   <2e-16 ***
+b1 7.974e+00  1.961e-04 40659.2   <2e-16 ***
+b2 1.002e+00  1.437e-05 69717.4   <2e-16 ***
+---
+Signif. codes:  0 ‘***’ 0.001 ‘**’ 0.01 ‘*’ 0.05 ‘.’ 0.1 ‘ ’ 1
 
+Residual standard error: 0.0008902 on 360368 degrees of freedom
 
+Number of iterations to convergence: 5 
+Achieved convergence tolerance: 1.49e-08
 
+Formula: Contact_Area_Portside ~ b0 + b1 * cos(b2 * PORTSIDE_DOOR_ROLL * 
+    pi/180)
+
+Parameters:
+    Estimate Std. Error t value Pr(>|t|)    
+b0 2.136e-02  1.748e-04   122.2   <2e-16 ***
+b1 7.979e+00  1.744e-04 45738.6   <2e-16 ***
+b2 1.001e+00  1.278e-05 78337.5   <2e-16 ***
+---
+Signif. codes:  0 ‘***’ 0.001 ‘**’ 0.01 ‘*’ 0.05 ‘.’ 0.1 ‘ ’ 1
+
+Residual standard error: 0.0007226 on 370219 degrees of freedom
+
+Number of iterations to convergence: 6 
+Achieved convergence tolerance: 1.49e-08
+
+contact_area_threshold <- 0.50 * 8.00  # 50% of the full area (4.00 m²)
+> 
+> # Identify rows where contact area is significantly reduced for Starboard
+> starboard_reduced <- floating_tension_with_core_df %>%
++     filter(Contact_Area_Starboard < contact_area_threshold | abs(STARBOARD_DOOR_ROLL) > 60)
+> 
+> # Identify rows where contact area is significantly reduced for Portside
+> portside_reduced <- floating_tension_with_core_df %>%
++     filter(Contact_Area_Portside < contact_area_threshold | abs(PORTSIDE_DOOR_ROLL) > 60)
+> 
+> # Display summary statistics
+> cat("Starboard Significant Contact Loss Cases:\n")
+Starboard Significant Contact Loss Cases:
+> summary(starboard_reduced$Contact_Area_Starboard)
+   Min. 1st Qu.  Median    Mean 3rd Qu.    Max. 
+  0.000   1.247   2.300   2.183   3.184   3.998 
+> 
+> cat("\nPortside Significant Contact Loss Cases:\n")
+
+Portside Significant Contact Loss Cases:
+> summary(portside_reduced$Contact_Area_Portside)
+   Min. 1st Qu.  Median    Mean 3rd Qu.    Max. 
+  0.000   1.109   2.182   2.107   3.136   3.998 
+> 
+> # Count occurrences of reduced contact area
+> cat("\nNumber of Starboard cases where contact area is significantly reduced:", nrow(starboard_reduced), "\n")
+
+Number of Starboard cases where contact area is significantly reduced: 8385 
+> cat("Number of Portside cases where contact area is significantly reduced:", nrow(portside_reduced), "\n")
+Number of Portside cases where contact area is significantly reduced: 6743 
+> library(ggplot2)
+> floating_tension_with_core_df <- data.frame(
++     Door = c(rep("Starboard", nrow(starboard_reduced)), rep("Portside", nrow(portside_reduced))),
++     Contact_Area = c(starboard_reduced$Contact_Area_Starboard, portside_reduced$Contact_Area_Portside)
++ )
+
+Wilcoxon test for annotation
+> wilcox_test <- wilcox.test(starboard_reduced$Contact_Area_Starboard, 
++                            portside_reduced$Contact_Area_Portside, 
++                            alternative = "two.sided")
+> 
+> p_value <- signif(wilcox_test$p.value, digits = 3)  # Format p-value for clarity
+> 
+> # Combine data into a single dataframe for plotting
+> floating_tension_with_core_df <- data.frame(
++     Door = c(rep("Starboard", nrow(starboard_reduced)), rep("Portside", nrow(portside_reduced))),
++     Contact_Area = c(starboard_reduced$Contact_Area_Starboard, portside_reduced$Contact_Area_Portside)
+
+ # Create boxplot with p-value annotation
+> ggplot(floating_tension_with_core_df, aes(x = Door, y = Contact_Area, fill = Door)) +
++     geom_boxplot(outlier.shape = 1, alpha = 0.6, notch = TRUE) +  # Transparent and notched boxplot
++     theme_minimal() +
++     labs(title = "Comparison of Significant Contact Area Reduction",
++          x = "Otter Door",
++          y = "Effective Contact Area (m²)") +
++     scale_fill_manual(values = c("Starboard" = "blue", "Portside" = "red")) +
++     geom_text(aes(x = "Starboard", y = starboard_median, label = round(starboard_median, 2)), 
++               color = "black", vjust = -1, size = 5) +
++     geom_text(aes(x = "Portside", y = portside_median, label = round(portside_median, 2)), 
++               color = "black", vjust = -1, size = 5) +
++     annotate("text", x = 1.5, y = 3.8, label = paste("Wilcoxon p =", p_value), size = 5, fontface = "bold") + 
++     coord_cartesian(ylim = c(0, 4))  # Adjust y-axis for clarity
+> View(floating_tension_with_core_df)
+
+---------------------------------------------------------------------------------------------------------------------------
+Boxplot 2 (Assumes Contact Area is 8.0 based on Total Area of the Otter Door) (Effective Contact Area Across Folk Sediment Classes Port and Starboard)
+
+ggplot(full_contact_data_long, aes(x = Folk_class, y = Contact_Area, fill = Door)) +
++     geom_violin(trim = FALSE, scale = "width", alpha = 0.7, width = 0.8, position = position_dodge(width = 0.8)) +  
++     geom_jitter(aes(color = Door), size = 0.4, alpha = 0.4, width = 0.2) +  # Removed position_dodge()
++     theme_minimal() +
++     labs(title = "Effective Contact Area Across Folk Sediment Classes (Port and Starboard)",
++          x = "Folk Sediment Class",
++          y = "Effective Contact Area (m²)") +
++     scale_fill_manual(values = c("Contact_Area_Starboard" = "blue", 
++                                  "Contact_Area_Portside" = "red")) +
++     scale_color_manual(values = c("Contact_Area_Starboard" = "blue", 
++                                   "Contact_Area_Portside" = "red")) +
++     theme(axis.text.x = element_text(angle = 45, hjust = 1, size = 10),  # Rotate x-axis labels
++           axis.title = element_text(size = 12),
++           legend.title = element_text(size = 12),
++           legend.text = element_text(size = 10)) +
++     coord_cartesian(ylim = c(0, 8))  # Set y-axis limits for clarity
+
+--------------------------------------------------------------------------------------------------------------------------
+Contact Area Vs. Grain (Based on the just the width of the otter door)
+
+floating_tension_with_core_df <- floating_tension_with_core_df %>%
++     mutate(
++         Adjusted_Grain = case_when(
++             Folk_class == "Mud" ~ 0.2,  # Use 0.2 mm instead of near-zero
++             Folk_class == "Sand" ~ 0.5,
++             Folk_class == "Gravel" ~ 16,
++             TRUE ~ Avg_Grain
++         )
++     )
+> floating_tension_with_core_df <- floating_tension_with_core_df %>%
++     mutate(
++         Refined_Contact_Area_Starboard = ifelse(Refined_Contact_Area_Starboard < 0, 0, Refined_Contact_Area_Starboard),
++         Refined_Contact_Area_Portside = ifelse(Refined_Contact_Area_Portside < 0, 0, Refined_Contact_Area_Portside)
++     )
+> ggplot(floating_tension_with_core_df, aes(x = Adjusted_Grain, y = Refined_Contact_Area_Starboard, color = Folk_class)) +
++     geom_point(alpha = 0.5) +
++     geom_smooth(method = "lm", se = FALSE, color = "black") +
++     scale_x_log10(breaks = c(0.2, 0.5, 16),  # Mud is now 0.2 mm to avoid log issues
++                   labels = c("Mud (0.2 mm)", "Sand (0.5 mm)", "Gravel (16 mm)")) +
++     labs(title = "Contact Area vs. Grain Size (Portside & Starboard)",
++          x = "Average Grain Size (log scale)",
++          y = "Contact Area (m)") +
++     theme_minimal()
 
 
 ```{r setup, include=FALSE}
